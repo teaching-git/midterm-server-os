@@ -121,8 +121,22 @@ def get_lease(ns=NS, iface=CLI0):
         lease = _parse_lease(out)
         if lease.get("fixed_address"):
             break
-    # stop the daemon so a re-grade starts clean
-    run(["ip", "netns", "exec", ns, "dhcpcd", "-k", iface], timeout=10)
+    # dhcpcd in a namespace grants the lease but does NOT reliably apply the
+    # address/route to the interface (it logs "Failed to set DNS configuration:
+    # Link N not known"). So we plumb the leased values onto the interface
+    # ourselves, so the DNS probes below can actually route to the server.
+    # We do NOT kill dhcpcd here anymore -- the interface must stay configured
+    # for C1/C2/C3/C11. Teardown happens at the end of the whole run.
+    if lease.get("fixed_address"):
+        ip = lease["fixed_address"]
+        # mask -> prefix (assume /24 for the lab's 255.255.255.0)
+        # flush first so a re-grade does not hit "address already assigned"
+        run(["ip", "netns", "exec", ns, "ip", "addr", "flush", "dev", iface], timeout=8)
+        run(["ip", "netns", "exec", ns, "ip", "addr", "add",
+             ip + "/24", "dev", iface], timeout=8)
+        if lease.get("routers"):
+            run(["ip", "netns", "exec", ns, "ip", "route", "add", "default",
+                 "via", lease["routers"]], timeout=8)
     return lease
 
 
