@@ -1,0 +1,17 @@
+{
+  "title": "Server OS Midterm - Lab 01 (novapeak)",
+  "description": "A company DNS + DHCP environment that is broken in several ways. Find the faults, prove them, fix them, and submit.",
+  "details": {
+    "intro": {
+      "text": "intro.md",
+      "background": "setup.sh"
+    },
+    "steps": [
+      { "title": "Find and fix the faults", "text": "step1.md" }
+    ],
+    "finish": { "text": "finish.md" }
+  },
+  "backend": {
+    "imageid": "ubuntu"
+  }
+}
