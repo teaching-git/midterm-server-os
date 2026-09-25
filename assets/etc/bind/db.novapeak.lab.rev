@@ -1,7 +1,0 @@
-$TTL 3600
-@ IN SOA ns1.novapeak.lab. admin.novapeak.lab. ( 2024010101 3600 1800 604800 3600 )
-@ IN NS ns1.novapeak.lab.
-10 IN PTR ns1.novapeak.lab.
-20 IN PTR www.novapeak.lab.
-30 IN PTR mail.novapeak.lab.
-40 IN PTR api.novapeak.lab.
