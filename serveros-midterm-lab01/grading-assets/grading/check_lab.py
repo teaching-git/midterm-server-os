@@ -93,26 +93,25 @@ class Results:
 # Client-side primitives: drive a real lease, and dig from the namespace.
 # ---------------------------------------------------------------------------
 def get_lease(ns=NS, iface=CLI0):
-    """Drive a real DHCP client (dhcpcd) inside the namespace and return the
-    leased values, or {} if no lease was obtained.
+    """Drive dhcpcd inside the namespace and return the leased values, or {}.
 
-    This image (Ubuntu 24.04) ships dhcpcd, not dhclient. We use:
-      dhcpcd -1 -t <secs> <iface>   -> one-shot: get a lease then exit
-      dhcpcd -U <iface>             -> dump the lease as key=value lines
-    and parse the BOUND block. We release first so a re-grade starts clean.
-
-    dhcpcd writes state under /var/lib/dhcpcd and wants a writable run dir; in a
-    namespace that is fine since we run as root. -1 (oneshot) prevents it from
-    daemonising and hanging the grader; -t bounds how long a broken setup can
-    stall us."""
-    # release any prior lease on this iface, ignore errors
+    IMPORTANT (dhcpcd 10.x, verified on the target image): `dhcpcd -U` (dump
+    lease) only works against a RUNNING daemon. Oneshot mode (-1) exits as soon
+    as it leases, after which -U reports "not running" and we would wrongly see
+    no lease. So we start dhcpcd in the BACKGROUND (-b), let it lease, dump the
+    lease with -U (full key=value incl. domain_name_servers -- needed for the
+    integration check), then stop it with -k. -t bounds the wait so a broken
+    server fails fast."""
+    # clean any prior client instance
     run(["ip", "netns", "exec", ns, "dhcpcd", "-k", iface], timeout=10)
-    # one-shot request; -t timeout so a broken server fails fast
-    run(["ip", "netns", "exec", ns, "dhcpcd", "-1", "-t", "12", iface],
-        timeout=20)
-    # dump what we got and parse it
-    rc, out, err = run(["ip", "netns", "exec", ns, "dhcpcd", "-U", iface],
-                       timeout=10)
+    # background lease attempt
+    run(["ip", "netns", "exec", ns, "dhcpcd", "-b", "-t", "12", iface], timeout=20)
+    # give it a moment to complete the handshake, then dump the lease
+    import time as _t
+    _t.sleep(3)
+    rc, out, err = run(["ip", "netns", "exec", ns, "dhcpcd", "-U", iface], timeout=10)
+    # stop the daemon so re-grading starts clean
+    run(["ip", "netns", "exec", ns, "dhcpcd", "-k", iface], timeout=10)
     return _parse_lease(out)
 
 
