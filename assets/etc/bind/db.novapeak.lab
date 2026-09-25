@@ -1,0 +1,7 @@
+$TTL 3600
+@ IN SOA ns1.novapeak.lab. admin.novapeak.lab. ( 2024010101 3600 1800 604800 3600 )
+@ IN NS ns1.novapeak.lab.
+ns1 IN A 192.168.19.10
+www IN A 192.168.19.20
+mail IN A 192.168.19.30
+api IN A 192.168.19.1
