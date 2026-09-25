@@ -95,24 +95,35 @@ class Results:
 def get_lease(ns=NS, iface=CLI0):
     """Drive dhcpcd inside the namespace and return the leased values, or {}.
 
-    IMPORTANT (dhcpcd 10.x, verified on the target image): `dhcpcd -U` (dump
-    lease) only works against a RUNNING daemon. Oneshot mode (-1) exits as soon
-    as it leases, after which -U reports "not running" and we would wrongly see
-    no lease. So we start dhcpcd in the BACKGROUND (-b), let it lease, dump the
-    lease with -U (full key=value incl. domain_name_servers -- needed for the
-    integration check), then stop it with -k. -t bounds the wait so a broken
-    server fails fast."""
-    # clean any prior client instance
+    dhcpcd 10.x (verified on target): `-U` (dump) only works against a RUNNING
+    daemon, so we run dhcpcd in the background and dump while it lives, then
+    stop it.
+
+    CRITICAL: the background launch must NOT go through the normal run()
+    helper. run() uses subprocess.run(), which waits for stdout/stderr pipes to
+    close; when dhcpcd backgrounds (-b) the daemon child inherits those pipes,
+    so subprocess.run() blocks until timeout and the timing gets mangled. We
+    therefore launch -b with Popen and output redirected to devnull so nothing
+    waits on the daemon, then poll for the lease with -U."""
+    import subprocess as _sp, time as _t, os as _os
+    # clean any prior client instance (ok if none running)
     run(["ip", "netns", "exec", ns, "dhcpcd", "-k", iface], timeout=10)
-    # background lease attempt
-    run(["ip", "netns", "exec", ns, "dhcpcd", "-b", "-t", "12", iface], timeout=20)
-    # give it a moment to complete the handshake, then dump the lease
-    import time as _t
-    _t.sleep(3)
-    rc, out, err = run(["ip", "netns", "exec", ns, "dhcpcd", "-U", iface], timeout=10)
-    # stop the daemon so re-grading starts clean
+    # launch dhcpcd in the background WITHOUT waiting on its pipes
+    devnull = open(_os.devnull, "w")
+    _sp.Popen(["ip", "netns", "exec", ns, "dhcpcd", "-b", "-t", "12", iface],
+              stdout=devnull, stderr=devnull)
+    # poll up to ~12s for a lease to appear via -U (dump against the daemon)
+    lease = {}
+    for _ in range(12):
+        _t.sleep(1)
+        rc, out, err = run(["ip", "netns", "exec", ns, "dhcpcd", "-U", iface],
+                           timeout=8)
+        lease = _parse_lease(out)
+        if lease.get("fixed_address"):
+            break
+    # stop the daemon so a re-grade starts clean
     run(["ip", "netns", "exec", ns, "dhcpcd", "-k", iface], timeout=10)
-    return _parse_lease(out)
+    return lease
 
 
 def _parse_lease(dump_text):
