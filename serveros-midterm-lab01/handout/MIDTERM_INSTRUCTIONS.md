@@ -160,9 +160,6 @@ part of the work they did.
 | 3 | AI usage declaration, comparison, and critique | 30 |
 | | **Total** | **100** |
 
-Part 1 is scored automatically against outcomes on a real client. Parts 2 and 3
-are read and graded by your instructor. You must have a genuinely working system
-and your own diagnosis to do Parts 2 and 3 meaningfully.
 
 Individual contribution is assessed from commit history and authorship. A member
 with no commits may receive a reduced mark.
